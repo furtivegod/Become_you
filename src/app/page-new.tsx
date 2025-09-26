@@ -37,7 +37,6 @@ export default function Home() {
               </div>
             </div>
             
-            {/* Start Assessment Button */}
             <div className="mt-8">
               <a 
                 href="https://your-samcart-checkout-url.com" 
