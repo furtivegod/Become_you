@@ -102,11 +102,11 @@ export default function BecomeYou_API_TesterPage() {
                 <option value="failed">failed</option>
               </select>
             </div>
-            <div className="flex items-center space-x-2">
+            {/* <div className="flex items-center space-x-2">
               <input id="use-header" type="checkbox" checked={testHeader} onChange={(e) => setTestHeader(e.target.checked)} />
               <label htmlFor="use-header" className="text-sm text-gray-700">Send x-test-webhook header (webhook only)</label>
-            </div>
-            <div>
+            </div> */}
+            {/* <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Payload Mode (webhook only)</label>
               <div className="flex space-x-4">
                 <label className="flex items-center space-x-2">
@@ -128,7 +128,7 @@ export default function BecomeYou_API_TesterPage() {
                   <span>Query params</span>
                 </label>
               </div>
-            </div>
+            </div> */}
 
             <div className="flex items-center space-x-3">
               <button

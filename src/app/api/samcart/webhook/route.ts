@@ -113,30 +113,36 @@ export async function POST(request: NextRequest) {
       orderRow = order as unknown as typeof orderRow
     }
 
-    // Create assessment session
-    const { data: session, error: sessionError } = await supabaseAdmin
-      .from('sessions')
-      .insert({
-        user_id: user.id,
-        status: 'active'
-      })
-      .select('id')
-      .single()
-
-    if (sessionError) {
-      console.error('Error creating session:', sessionError)
+    // Create assessment session via internal API
+    const sessionApiUrl = new URL('/api/assessment/session', request.url)
+    const sessionRes = await fetch(sessionApiUrl.toString(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id }),
+      cache: 'no-store'
+    })
+    if (!sessionRes.ok) {
+      const errText = await sessionRes.text().catch(() => 'Session API error')
+      console.error('Session API error:', errText)
+      return NextResponse.json({ error: 'Failed to create session' }, { status: 500 })
+    }
+    const sessionJson: any = await sessionRes.json()
+    const sessionId: string | undefined = sessionJson?.session?.id
+    if (!sessionId) {
+      console.error('Session API returned no session id:', sessionJson)
       return NextResponse.json({ error: 'Failed to create session' }, { status: 500 })
     }
 
     // Compute magic link for response
-    const token = generateToken(session.id, customer_email)
-    const magicLink = `${process.env.NEXT_PUBLIC_APP_URL}/assessment/${session.id}?token=${token}`
+    const token = generateToken(sessionId, customer_email)
+    const magicLink = `${process.env.NEXT_PUBLIC_APP_URL}/assessment/${sessionId}?token=${token}`
 
     // Send magic link email (skip in test mode if email is clearly fake)
     let emailed = false
-    
-    await sendMagicLink(customer_email, session.id)
-    emailed = true
+    if (!isTest || (isTest && customer_email !== 'deondreivory328@gmail.com')) {
+      await sendMagicLink(customer_email, sessionId)
+      emailed = true
+    }
 
     return NextResponse.json({ 
       verified: true,
@@ -145,7 +151,7 @@ export async function POST(request: NextRequest) {
       email_to: customer_email,
       user,
       order: orderRow,
-      session_id: session.id,
+      session_id: sessionId,
       magic_link: magicLink
     })
 
