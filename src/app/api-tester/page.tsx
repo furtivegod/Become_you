@@ -3,8 +3,7 @@
 import { useState } from "react"
 
 export default function BecomeYou_API_TesterPage() {
-  const [email, setEmail] = useState("you@example.com")
-  const [orderId, setOrderId] = useState("test_" + Date.now())
+  const [email, setEmail] = useState("deondreivory328@gmail.com")
   const [status, setStatus] = useState("completed")
   const [testHeader, setTestHeader] = useState(true)
   const [bodyMode, setBodyMode] = useState<"query" | "json">("json")
@@ -24,7 +23,6 @@ export default function BecomeYou_API_TesterPage() {
       url.searchParams.set("test", "1")
       if (bodyMode === "query") {
         url.searchParams.set("email", email)
-        url.searchParams.set("order_id", orderId)
       }
 
       const res = await fetch(url.toString(), {
@@ -35,12 +33,17 @@ export default function BecomeYou_API_TesterPage() {
         },
         body:
           bodyMode === "json"
-            ? JSON.stringify({ status, customer_email: email, order_id: orderId })
+            ? JSON.stringify({ status, customer_email: email })
             : undefined,
       })
 
       const text = await res.text()
-      setResponseText(text)
+      try {
+        const json = JSON.parse(text)
+        setResponseText(JSON.stringify(json, null, 2))
+      } catch {
+        setResponseText(text)
+      }
     } catch (e: any) {
       setResponseText("Request failed: " + (e?.message || String(e)))
     } finally {
@@ -58,7 +61,12 @@ export default function BecomeYou_API_TesterPage() {
         body: JSON.stringify({ userId: sessionUserId })
       })
       const text = await res.text()
-      setSessionResponse(text)
+      try {
+        const json = JSON.parse(text)
+        setSessionResponse(JSON.stringify(json, null, 2))
+      } catch {
+        setSessionResponse(text)
+      }
     } catch (e: any) {
       setSessionResponse("Request failed: " + (e?.message || String(e)))
     } finally {
@@ -81,14 +89,6 @@ export default function BecomeYou_API_TesterPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 type="email"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Order ID</label>
-              <input
-                className="w-full border rounded px-3 py-2"
-                value={orderId}
-                onChange={(e) => setOrderId(e.target.value)}
               />
             </div>
             <div>

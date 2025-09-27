@@ -3,6 +3,10 @@ import jwt from 'jsonwebtoken'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+const FROM = process.env.NODE_ENV === 'production'
+  ? 'BECOME YOU <noreply@becomeyou.com>'
+  : 'onboarding@resend.dev'
+
 export async function sendMagicLink(email: string, sessionId: string) {
   const token = jwt.sign(
     { sessionId, email },
@@ -14,7 +18,7 @@ export async function sendMagicLink(email: string, sessionId: string) {
   
   try {
     const { data, error } = await resend.emails.send({
-      from: 'BECOME YOU <noreply@becomeyou.com>',
+      from: FROM,
       to: [email],
       subject: 'Your Personal Assessment is Ready',
       html: `
@@ -46,7 +50,7 @@ export async function sendMagicLink(email: string, sessionId: string) {
 export async function sendReportEmail(email: string, pdfUrl: string) {
   try {
     const { data, error } = await resend.emails.send({
-      from: 'BECOME YOU <noreply@becomeyou.com>',
+      from: FROM,
       to: [email],
       subject: 'Your Personalized 30-Day Protocol is Ready',
       html: `

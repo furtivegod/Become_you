@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase'
 import { sendMagicLink } from '@/lib/email'
+import { generateToken } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
     // Create or get user
     let { data: user, error: userError } = await supabaseAdmin
       .from('users')
-      .select('id')
+      .select('id, email, created_at')
       .eq('email', customer_email)
       .single()
 
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
       const { data: newUser, error: createError } = await supabaseAdmin
         .from('users')
         .insert({ email: customer_email })
-        .select('id')
+        .select('id, email, created_at')
         .single()
 
       if (createError) {
@@ -78,7 +79,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 500 })
     }
 
-    // Create order record (ignore duplicate provider_ref errors gracefully in test mode)
+    // Create order record (handle duplicate provider_ref by selecting existing)
+    let orderRow: { id: string; user_id: string; provider_ref: string; status: string } | undefined
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
       .insert({
@@ -86,15 +88,29 @@ export async function POST(request: NextRequest) {
         provider_ref: order_id,
         status: 'completed'
       })
-      .select('id')
+      .select('id, user_id, provider_ref, status')
       .single()
 
     if (orderError) {
       const isUniqueViolation = (orderError as unknown as { code?: string }).code === '23505'
-      if (!isTest || !isUniqueViolation) {
+      if (isUniqueViolation) {
+        // Fetch existing order row by provider_ref
+        const { data: existingOrder, error: selectError } = await supabaseAdmin
+          .from('orders')
+          .select('id, user_id, provider_ref, status')
+          .eq('provider_ref', order_id)
+          .single()
+        if (selectError || !existingOrder) {
+          console.error('Error selecting existing order:', selectError)
+          return NextResponse.json({ error: 'Failed to get existing order' }, { status: 500 })
+        }
+        orderRow = existingOrder
+      } else {
         console.error('Error creating order:', orderError)
         return NextResponse.json({ error: 'Failed to create order' }, { status: 500 })
       }
+    } else {
+      orderRow = order as unknown as typeof orderRow
     }
 
     // Create assessment session
@@ -112,15 +128,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create session' }, { status: 500 })
     }
 
+    // Compute magic link for response
+    const token = generateToken(session.id, customer_email)
+    const magicLink = `${process.env.NEXT_PUBLIC_APP_URL}/assessment/${session.id}?token=${token}`
+
     // Send magic link email (skip in test mode if email is clearly fake)
-    if (!isTest || (isTest && customer_email !== 'tester@example.com')) {
-      await sendMagicLink(customer_email, session.id)
-    }
+    let emailed = false
+    
+    await sendMagicLink(customer_email, session.id)
+    emailed = true
 
     return NextResponse.json({ 
-      message: isTest ? 'Test webhook processed successfully' : 'Webhook processed successfully',
+      verified: true,
+      test_mode: isTest,
+      emailed,
+      email_to: customer_email,
+      user,
+      order: orderRow,
       session_id: session.id,
-      test_mode: isTest
+      magic_link: magicLink
     })
 
   } catch (error) {
