@@ -17,15 +17,12 @@ export interface User {
   id: string
   email: string
   created_at: string
-  updated_at: string
 }
 
 export interface Order {
   id: string
   user_id: string
-  samcart_order_id: string
-  amount: number
-  currency: string
+  provider_ref: string
   status: string
   created_at: string
 }
@@ -33,10 +30,9 @@ export interface Order {
 export interface Session {
   id: string
   user_id: string
-  order_id: string
   status: string
-  created_at: string
-  completed_at?: string
+  started_at: string
+  ended_at?: string
 }
 
 export interface Message {
@@ -44,13 +40,15 @@ export interface Message {
   session_id: string
   role: 'user' | 'assistant'
   content: string
-  created_at: string
+  flags?: Record<string, unknown>
+  ts: string
 }
 
 export interface PlanOutput {
   id: string
   session_id: string
-  plan_data: Record<string, unknown>
+  plan_json: Record<string, unknown>
+  version: number
   created_at: string
 }
 
@@ -59,6 +57,6 @@ export interface PdfJob {
   session_id: string
   status: string
   pdf_url?: string
+  error?: string
   created_at: string
-  completed_at?: string
 }

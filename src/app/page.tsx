@@ -39,7 +39,7 @@ export default function Home() {
             
             <div className="mt-8">
               <a 
-                href="https://becomecart.samcart.com/products/become-you" 
+                href="https://becomecart.mysamcart.com/checkout/become-you" 
                 className="inline-block bg-blue-500 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-blue-600 transition-colors shadow-lg"
               >
                 Start Your Assessment - $97

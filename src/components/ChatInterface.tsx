@@ -29,6 +29,18 @@ export default function ChatInterface({ sessionId, onComplete }: ChatInterfacePr
     scrollToBottom()
   }, [messages])
 
+  const triggerReportGeneration = async () => {
+    try {
+      await fetch('/api/report/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId })
+      })
+    } catch (e) {
+      console.error('Failed to trigger report generation:', e)
+    }
+  }
+
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return
 
@@ -92,11 +104,12 @@ export default function ChatInterface({ sessionId, onComplete }: ChatInterfacePr
         }
       }
 
-      // Check if assessment is complete
-      if (assistantMessage.content.includes('assessment is complete') || 
-          assistantMessage.content.includes('protocol is ready')) {
+      // Heuristic: assessment complete when assistant signals synthesis/next steps
+      const completionSignals = ['assessment is complete', 'protocol is ready', 'next steps', 'I will now create your 30-day protocol']
+      if (completionSignals.some(sig => assistantMessage.content.toLowerCase().includes(sig))) {
         setIsComplete(true)
         onComplete()
+        await triggerReportGeneration()
       }
 
     } catch (error) {

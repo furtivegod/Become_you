@@ -1,9 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import ChatInterface from "@/components/ChatInterface"
 import ConsentScreen from "@/components/ConsentScreen"
-import { verifyToken } from "@/lib/auth"
 
 interface AssessmentPageProps {
   params: { sessionId: string }
@@ -14,9 +13,41 @@ export default function AssessmentPage({ params, searchParams }: AssessmentPageP
   const { sessionId } = params
   const { token } = searchParams
   const [hasConsented, setHasConsented] = useState(false)
+  const [isValid, setIsValid] = useState<boolean | null>(null)
 
-  // Verify token and session
-  const isValid = verifyToken(token, sessionId)
+  useEffect(() => {
+    let isMounted = true
+    async function validate() {
+      if (!token) {
+        if (isMounted) setIsValid(false)
+        return
+      }
+      try {
+        const res = await fetch(`/api/jwt?token=${encodeURIComponent(token)}`)
+        if (!res.ok) {
+          if (isMounted) setIsValid(false)
+          return
+        }
+        const data = await res.json()
+        if (isMounted) setIsValid(data.valid === true && data.sessionId === sessionId)
+      } catch (e) {
+        console.error('Token validation failed:', e)
+        if (isMounted) setIsValid(false)
+      }
+    }
+    validate()
+    return () => { isMounted = false }
+  }, [token, sessionId])
+
+  if (isValid === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-xl font-semibold text-gray-700">Validating access…</h1>
+        </div>
+      </div>
+    )
+  }
 
   if (!isValid) {
     return (
@@ -46,11 +77,9 @@ export default function AssessmentPage({ params, searchParams }: AssessmentPageP
               <h1 className="text-2xl font-bold text-gray-800">BECOME YOU Assessment</h1>
               <p className="text-gray-600">Let&apos;s discover your path to transformation</p>
             </div>
-            
             <ChatInterface 
               sessionId={sessionId} 
               onComplete={() => {
-                // Handle completion
                 console.log('Assessment completed')
               }}
             />
@@ -59,4 +88,4 @@ export default function AssessmentPage({ params, searchParams }: AssessmentPageP
       </div>
     </div>
   )
-}
+} 

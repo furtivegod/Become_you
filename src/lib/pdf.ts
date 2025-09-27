@@ -1,5 +1,5 @@
 import { chromium } from 'playwright'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin as supabase } from '@/lib/supabase'
 
 interface PlanData {
   title: string

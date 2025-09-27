@@ -1,21 +1,18 @@
--- BECOME YOU MVP Database Schema
--- Supabase tables for the assessment platform
+-- Personal Development Assessment MVP Database Schema
+-- Updated to match the exact requirements
 
 -- Users table
 CREATE TABLE users (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   email VARCHAR(255) UNIQUE NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Orders table (from SamCart)
 CREATE TABLE orders (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  samcart_order_id VARCHAR(255) UNIQUE NOT NULL,
-  amount DECIMAL(10,2) NOT NULL,
-  currency VARCHAR(3) DEFAULT 'USD',
+  provider_ref VARCHAR(255) UNIQUE NOT NULL, -- SamCart order ID
   status VARCHAR(50) DEFAULT 'completed',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -24,10 +21,9 @@ CREATE TABLE orders (
 CREATE TABLE sessions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
   status VARCHAR(50) DEFAULT 'active',
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  completed_at TIMESTAMP WITH TIME ZONE
+  started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  ended_at TIMESTAMP WITH TIME ZONE
 );
 
 -- Chat messages
@@ -36,14 +32,16 @@ CREATE TABLE messages (
   session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
   role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant')),
   content TEXT NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  flags JSONB, -- For storing message metadata/flags
+  ts TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Plan outputs (structured JSON from Claude)
+-- Plan outputs (structured JSON from AI)
 CREATE TABLE plan_outputs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
-  plan_data JSONB NOT NULL,
+  plan_json JSONB NOT NULL, -- Changed from plan_data to plan_json
+  version INTEGER DEFAULT 1,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -53,8 +51,8 @@ CREATE TABLE pdf_jobs (
   session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
   status VARCHAR(50) DEFAULT 'pending',
   pdf_url TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  completed_at TIMESTAMP WITH TIME ZONE
+  error TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Row Level Security (RLS) policies
@@ -97,7 +95,10 @@ CREATE INDEX idx_plan_outputs_session_id ON plan_outputs(session_id);
 CREATE INDEX idx_pdf_jobs_session_id ON pdf_jobs(session_id);
 
 -- Create storage bucket for reports
-INSERT INTO storage.buckets (id, name, public) VALUES ('reports', 'reports', true);
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('reports', 'reports', true)
+ON CONFLICT (id) DO UPDATE
+SET name = EXCLUDED.name, public = EXCLUDED.public;
 
 -- Storage policies
 CREATE POLICY "Users can view own reports" ON storage.objects

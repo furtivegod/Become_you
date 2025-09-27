@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin as supabase } from '@/lib/supabase'
 import { generateClaudeResponse } from '@/lib/claude'
 
 export async function POST(request: NextRequest) {
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
       .from('messages')
       .select('role, content')
       .eq('session_id', sessionId)
-      .order('created_at', { ascending: true })
+      .order('ts', { ascending: true })
 
     if (messagesError) {
       console.error('Error fetching messages:', messagesError)

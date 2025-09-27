@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabase } from '@/lib/supabase'
+import { supabaseAdmin as supabase } from '@/lib/supabase'
 import { generateStructuredPlan } from '@/lib/claude'
 import { generatePDF } from '@/lib/pdf'
 import { sendReportEmail } from '@/lib/email'
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       .from('messages')
       .select('role, content')
       .eq('session_id', sessionId)
-      .order('created_at', { ascending: true })
+      .order('ts', { ascending: true })
 
     if (messagesError) {
       console.error('Error fetching messages:', messagesError)
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       .from('plan_outputs')
       .insert({
         session_id: sessionId,
-        plan_data: planData
+        plan_json: planData
       })
 
     if (planError) {
@@ -57,22 +57,32 @@ export async function POST(request: NextRequest) {
       console.error('Error updating PDF job:', pdfJobError)
     }
 
-    // Get user email
-    const { data: session, error: sessionError } = await supabase
+    // Get user id for session
+    const { data: sessionRow, error: sessionError } = await supabase
       .from('sessions')
-      .select(`
-        users!inner(email)
-      `)
+      .select('user_id')
       .eq('id', sessionId)
       .single()
 
-    if (sessionError) {
+    if (sessionError || !sessionRow) {
       console.error('Error fetching session:', sessionError)
       return NextResponse.json({ error: 'Failed to fetch session' }, { status: 500 })
     }
 
+    // Get user email
+    const { data: userRow, error: userError } = await supabase
+      .from('users')
+      .select('email')
+      .eq('id', sessionRow.user_id)
+      .single()
+
+    if (userError || !userRow) {
+      console.error('Error fetching user:', userError)
+      return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 })
+    }
+
     // Send report email
-    await sendReportEmail(session.users[0].email, pdfUrl)
+    await sendReportEmail(userRow.email, pdfUrl)
 
     return NextResponse.json({ 
       success: true,

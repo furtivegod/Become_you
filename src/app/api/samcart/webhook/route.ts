@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Order not completed, skipping' })
     }
 
-    const { customer_email, order_id, amount } = data
+    const { customer_email, order_id } = data
 
     // Create or get user
     let { data: user, error: userError } = await supabaseAdmin
@@ -68,8 +68,7 @@ export async function POST(request: NextRequest) {
       .from('orders')
       .insert({
         user_id: user.id,
-        samcart_order_id: order_id,
-        amount: parseFloat(amount),
+        provider_ref: order_id,
         status: 'completed'
       })
       .select('id')
@@ -85,7 +84,6 @@ export async function POST(request: NextRequest) {
       .from('sessions')
       .insert({
         user_id: user.id,
-        order_id: order.id,
         status: 'active'
       })
       .select('id')
