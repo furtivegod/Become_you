@@ -7,28 +7,23 @@ import { generateToken } from '@/lib/auth'
 export async function POST(request: NextRequest) {
   try {
     const url = new URL(request.url)
-    const isTest = url.searchParams.get('test') === '1'
-      || request.headers.get('x-test-webhook') === 'true'
-      || process.env.SAMCART_TEST_MODE === 'true'
 
     const body = await request.text()
     const signature = request.headers.get('x-samcart-signature')
     
-    if (!isTest) {
-      if (!signature) {
-        return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
-      }
+    if (!signature) {
+      return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
+    }
 
-      // Verify SamCart webhook signature
-      const webhookSecret = process.env.SAMCART_WEBHOOK_SECRET!
-      const expectedSignature = crypto
-        .createHmac('sha256', webhookSecret)
-        .update(body)
-        .digest('hex')
-      
-      if (signature !== expectedSignature) {
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
-      }
+    // Verify SamCart webhook signature
+    const webhookSecret = process.env.SAMCART_WEBHOOK_SECRET!
+    const expectedSignature = crypto
+      .createHmac('sha256', webhookSecret)
+      .update(body)
+      .digest('hex')
+    
+    if (signature !== expectedSignature) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 
     // Parse data (allow empty/minimal body in test mode)
@@ -42,7 +37,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Only process successful orders in non-test mode
-    if (!isTest && data.status !== 'completed') {
+    if (data.status !== 'completed') {
       return NextResponse.json({ message: 'Order not completed, skipping' })
     }
 
@@ -139,14 +134,12 @@ export async function POST(request: NextRequest) {
 
     // Send magic link email (skip in test mode if email is clearly fake)
     let emailed = false
-    if (!isTest || (isTest && customer_email !== 'deondreivory328@gmail.com')) {
-      await sendMagicLink(customer_email, sessionId)
-      emailed = true
-    }
-
+    
+    await sendMagicLink(customer_email, sessionId)
+    emailed = true
+    
     return NextResponse.json({ 
       verified: true,
-      test_mode: isTest,
       emailed,
       email_to: customer_email,
       user,

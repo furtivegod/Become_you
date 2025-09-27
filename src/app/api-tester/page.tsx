@@ -5,7 +5,6 @@ import { useState } from "react"
 export default function BecomeYou_API_TesterPage() {
   const [email, setEmail] = useState("deondreivory328@gmail.com")
   const [status, setStatus] = useState("completed")
-  const [testHeader, setTestHeader] = useState(true)
   const [bodyMode, setBodyMode] = useState<"query" | "json">("json")
   const [loading, setLoading] = useState(false)
   const [responseText, setResponseText] = useState("")
@@ -14,27 +13,51 @@ export default function BecomeYou_API_TesterPage() {
   const [sessionLoading, setSessionLoading] = useState(false)
   const [sessionResponse, setSessionResponse] = useState("")
 
+  async function hmacSHA256Hex(secret: string, message: string): Promise<string> {
+    const enc = new TextEncoder()
+    const key = await crypto.subtle.importKey(
+      "raw",
+      enc.encode(secret),
+      { name: "HMAC", hash: { name: "SHA-256" } },
+      false,
+      ["sign"]
+    )
+    const sigBuf = await crypto.subtle.sign("HMAC", key, enc.encode(message))
+    const bytes = new Uint8Array(sigBuf)
+    let hex = ""
+    for (let i = 0; i < bytes.length; i++) {
+      const h = bytes[i].toString(16).padStart(2, "0")
+      hex += h
+    }
+    return hex
+  }
+
   const callWebhook = async () => {
     setLoading(true)
     setResponseText("")
+    const webhookSecret = process.env.SAMCART_WEBHOOK_SECRET!
 
+    console.log(process.env.SAMCART_WEBHOOK_SECRET)
     try {
-      const url = new URL("/api/samcart/webhook", window.location.origin)
-      url.searchParams.set("test", "1")
-      if (bodyMode === "query") {
-        url.searchParams.set("email", email)
+      if (!webhookSecret) {
+        setResponseText("1234567890")
+        setLoading(false)
+        return
       }
+
+      const url = new URL("/api/samcart/webhook", window.location.origin)
+
+      const bodyObj = { status, customer_email: email }
+      const bodyStr = JSON.stringify(bodyObj)
+      const signature = await hmacSHA256Hex(webhookSecret, bodyStr)
 
       const res = await fetch(url.toString(), {
         method: "POST",
         headers: {
-          ...(testHeader ? { "x-test-webhook": "true" } : {}),
-          ...(bodyMode === "json" ? { "Content-Type": "application/json" } : {}),
+          "Content-Type": "application/json",
+          "x-samcart-signature": signature
         },
-        body:
-          bodyMode === "json"
-            ? JSON.stringify({ status, customer_email: email })
-            : undefined,
+        body: bodyStr
       })
 
       const text = await res.text()
@@ -79,7 +102,7 @@ export default function BecomeYou_API_TesterPage() {
       <div className="container mx-auto px-4 py-8 space-y-8">
         <div className="max-w-2xl mx-auto bg-white rounded-lg shadow p-6">
           <h1 className="text-2xl font-bold mb-4">SamCart Webhook Tester</h1>
-          <p className="text-gray-600 mb-6">Send a simulated purchase event to <code>/api/samcart/webhook</code> (test mode).</p>
+          <p className="text-gray-600 mb-6">Send a signed purchase event to <code>/api/samcart/webhook</code>.</p>
 
           <div className="space-y-4">
             <div>
@@ -91,52 +114,14 @@ export default function BecomeYou_API_TesterPage() {
                 type="email"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status (webhook only)</label>
-              <select
-                className="w-full border rounded px-3 py-2"
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-              >
-                <option value="completed">completed</option>
-                <option value="failed">failed</option>
-              </select>
-            </div>
-            {/* <div className="flex items-center space-x-2">
-              <input id="use-header" type="checkbox" checked={testHeader} onChange={(e) => setTestHeader(e.target.checked)} />
-              <label htmlFor="use-header" className="text-sm text-gray-700">Send x-test-webhook header (webhook only)</label>
-            </div> */}
-            {/* <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Payload Mode (webhook only)</label>
-              <div className="flex space-x-4">
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    name="body-mode"
-                    checked={bodyMode === "json"}
-                    onChange={() => setBodyMode("json")}
-                  />
-                  <span>JSON body</span>
-                </label>
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="radio"
-                    name="body-mode"
-                    checked={bodyMode === "query"}
-                    onChange={() => setBodyMode("query")}
-                  />
-                  <span>Query params</span>
-                </label>
-              </div>
-            </div> */}
-
+            
             <div className="flex items-center space-x-3">
               <button
                 onClick={callWebhook}
                 disabled={loading}
                 className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
               >
-                {loading ? 'Sending…' : 'Send Test Webhook (/api/samcart/webhook)'}
+                {loading ? 'Sending…' : 'Send Signed Webhook'}
               </button>
             </div>
 
